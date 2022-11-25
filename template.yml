@@ -1,0 +1,148 @@
+#AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Log parsing function.
+
+Parameters:
+  App:
+    Type: String
+    Default: "awsmonitoring"
+  LogLevel:
+    Type: String
+    Default: "ERROR"
+  OpenSearchHost:
+    Type: String
+  OpenSearchDomainArn:
+    Type: String
+
+Resources:
+  LogRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - 'logs.eu-central-1.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: ecr
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Resource:
+                  - '*'
+                Action:
+                  - logs:*
+                  - kinesis:*
+                  - es:*
+
+  LogStream:
+    Type: AWS::Kinesis::Stream
+    Properties:
+      Name: LogKinesisStream
+      RetentionPeriodHours: 24
+      ShardCount: 1
+
+  FirehoseRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - firehose.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: OpenSearch
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: 'es:*'
+                Resource:
+                  - !Sub "arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${App}v3/*"
+                  - !Sub "arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${App}v3"
+              - Effect: Allow
+                Action: 's3:*'
+                Resource:
+                  - !Sub "${FirehoseBucket.Arn}"
+                  - !Sub "${FirehoseBucket.Arn}/*"
+
+
+  FirehoseBucket:
+    Type: 'AWS::S3::Bucket'
+
+  Firehose:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties:
+      DeliveryStreamName: awsmonitoring-logs
+      DeliveryStreamType: DirectPut
+      AmazonopensearchserviceDestinationConfiguration:
+        DomainARN: !Ref OpenSearchDomainArn
+        IndexName: "hodor-logs"
+        IndexRotationPeriod: NoRotation
+        RoleARN: !Sub "${FirehoseRole.Arn}"
+        S3Configuration:
+          BucketARN: !Sub "${FirehoseBucket.Arn}"
+          RoleARN: !Sub "${FirehoseRole.Arn}"
+
+
+  LogDestination:
+    Type: AWS::Logs::Destination
+    Properties:
+      DestinationName: "LogDestination"
+      RoleArn: !Sub "${LogRole.Arn}"
+      TargetArn: !Sub "${LogStream.Arn}"
+    DependsOn:
+      - LogStream
+      - LogRole
+
+  SubscriptionFilter:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      RoleArn: !Sub "${LogRole.Arn}"
+      LogGroupName: "hodor-ecs-ECSLogGroup-KXMoTNKOFTBY"
+      FilterPattern: ""
+      DestinationArn: !Sub "${LogStream.Arn}"
+
+  LogParserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: app/
+      Handler: app.parse_logs
+      Runtime: python3.9
+      MemorySize: 128
+      Architectures:
+        - x86_64
+      Policies:
+        - Statement:
+            - Sid: KinesisFirehose
+              Effect: Allow
+              Action:
+                - kinesis:*
+                - firehose:*
+              Resource:
+                - '*'
+      Environment:
+        Variables:
+          region: 'eu-central-1'
+          host: !Ref OpenSearchHost
+          firehose_stream: !Ref Firehose
+      Events:
+        KinesisEvent:
+          Type: Kinesis
+          Properties:
+            Stream: !Sub "${LogStream.Arn}"
+            StartingPosition: TRIM_HORIZON
+            BatchSize: 10

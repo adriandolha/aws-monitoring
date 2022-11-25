@@ -1,0 +1,12 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "awsmonitoring-logging"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-11dieb3zb38yj"
+s3_prefix = "awsmonitoring-logging"
+region = "eu-central-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "App=\"awsmonitoring\" LogLevel=\"ERROR\" OpenSearchDomainArn=\"arn:aws:es:eu-central-1:103050589342:domain/awsmonitoringv3\" OpenSearchHost=\"search-awsmonitoringv3-obqnfz2yw4phgnae3ysv4elxvi.eu-central-1.es.amazonaws.com\""
+image_repositories = []
