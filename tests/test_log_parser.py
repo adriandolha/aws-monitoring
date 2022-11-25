@@ -42,11 +42,13 @@ class TestLogParser:
         assert result is None
 
     def test_log_gunicorn_failed_login(self):
+        # "10.0.2.207 - test_user21 [25/Nov/2022:11:23:04 +0000] 'GET /api/signin HTTP/1.1' "
+        # "401 31 4027 - python/gevent-http-client-2.0.8"
         result = log_parser.parse(
-            "10.0.2.207 - test_user21 [25/Nov/2022:11:23:04 +0000] 'GET /api/signin HTTP/1.1' "
-            "401 31 4027 - python/gevent-http-client-2.0.8")
-        assert result['source_ip'] == '10.0.2.207'
-        assert result['date'] == '2022-11-25T11:23:04+00:00'
+            "10.0.1.247 - test_user1 [25/Nov/2022:14:03:29 +0000] 'GET /api/signin HTTP/1.1' 401 31 4220 - python/gevent-http-client-2.0.8"
+            )
+        assert result['source_ip'] == '10.0.1.247'
+        assert result['date'] == '2022-11-25T14:03:29+00:00'
         assert result['http_method'] == 'GET'
         assert result['http_path'] == '/api/signin'
         assert result['http_code'] == '401'

@@ -46,7 +46,6 @@ Resources:
   LogStream:
     Type: AWS::Kinesis::Stream
     Properties:
-      Name: LogKinesisStream
       RetentionPeriodHours: 24
       ShardCount: 1
 
@@ -86,7 +85,7 @@ Resources:
   Firehose:
     Type: AWS::KinesisFirehose::DeliveryStream
     Properties:
-      DeliveryStreamName: awsmonitoring-logs
+#      DeliveryStreamName: awsmonitoring-logs
       DeliveryStreamType: DirectPut
       AmazonopensearchserviceDestinationConfiguration:
         DomainARN: !Ref OpenSearchDomainArn
@@ -101,7 +100,7 @@ Resources:
   LogDestination:
     Type: AWS::Logs::Destination
     Properties:
-      DestinationName: "LogDestination"
+      DestinationName: "LogsDestination"
       RoleArn: !Sub "${LogRole.Arn}"
       TargetArn: !Sub "${LogStream.Arn}"
     DependsOn:
@@ -144,5 +143,5 @@ Resources:
           Type: Kinesis
           Properties:
             Stream: !Sub "${LogStream.Arn}"
-            StartingPosition: TRIM_HORIZON
-            BatchSize: 10
+            StartingPosition: LATEST
+            BatchSize: 100
